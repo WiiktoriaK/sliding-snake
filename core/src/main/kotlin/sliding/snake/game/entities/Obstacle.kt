@@ -6,7 +6,7 @@ import com.badlogic.gdx.math.Polygon
 import sliding.snake.game.Config
 
 class Obstacle(
-    lane: Int,
+    private val lane: Int,
     private val obstacleWidth: Float,
     val obstacleHeight: Float,
     private val texture: Texture,
@@ -30,6 +30,9 @@ class Obstacle(
                                    obstacleHeight/texture.height.toFloat())
     }
 
+    fun getLane(): Int{
+        return lane
+    }
 
     fun update(delta: Float, speed: Float){
         y -= speed*delta

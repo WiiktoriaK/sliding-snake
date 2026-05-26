@@ -6,7 +6,7 @@ import com.badlogic.gdx.math.Polygon
 import sliding.snake.game.Config
 
 class Fruit(
-    lane: Int,
+    private val lane: Int,
     private val fruitWidth: Float,
     val fruitHeight: Float,
     private val texture: Texture,
@@ -31,7 +31,9 @@ class Fruit(
             fruitHeight/texture.height.toFloat())
     }
 
-
+    fun getLane(): Int{
+        return lane
+    }
     fun update(delta: Float, speed: Float){
         y -= speed*delta
         collisionPolygon.setPosition(x,y)

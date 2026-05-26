@@ -15,13 +15,15 @@ class PauseScreen(private val game: Main, private val prevScreen: BaseScreen) : 
     private lateinit var resumeButtonTexture: Texture
     private lateinit var backToMenuButton: Button
     private lateinit var backToMenuButtonTexture: Texture
+    private lateinit var settingsButton: Button
+    private lateinit var settingsButtonTexture: Texture
 
     private val touch = Vector3()
 
     override fun show(){
         resumeButtonTexture = game.assets.get(Config.TEX_RESUME_BUTTON, Texture::class.java)
         backToMenuButtonTexture = game.assets.get(Config.TEX_MENU_BUTTON, Texture::class.java)
-
+        settingsButtonTexture = game.assets.get(Config.TEX_SETTINGS_BUTTON, Texture::class.java)
 
         resumeButton = Button((Config.SCREEN_WIDTH - 200f)/2f, (Config.SCREEN_HEIGHT-200f)/2f + 100f,
             200f, 200f, resumeButtonTexture
@@ -30,7 +32,8 @@ class PauseScreen(private val game: Main, private val prevScreen: BaseScreen) : 
         backToMenuButton = Button((Config.SCREEN_WIDTH - 200f)/2f, (Config.SCREEN_HEIGHT-100f)/2f - 100f,
             200f, 100f, backToMenuButtonTexture
         )
-
+        settingsButton = Button(Config.SCREEN_WIDTH-150f, Config.SCREEN_HEIGHT-150f, 100f, 100f,
+            settingsButtonTexture)
     }
 
     override fun render(delta: Float) {
@@ -47,6 +50,7 @@ class PauseScreen(private val game: Main, private val prevScreen: BaseScreen) : 
         game.batch.begin()
         resumeButton.draw(game.batch)
         backToMenuButton.draw(game.batch)
+        settingsButton.draw(game.batch)
         game.batch.end()
 
     }
@@ -61,6 +65,8 @@ class PauseScreen(private val game: Main, private val prevScreen: BaseScreen) : 
             }else if(backToMenuButton.isClicked(touch)){
                 prevScreen.dispose()
                 game.setScreen(MenuScreen(game))
+            }else if(settingsButton.isClicked(touch)){
+                game.setScreen(SettingsScreen(game, this))
             }
 
         }

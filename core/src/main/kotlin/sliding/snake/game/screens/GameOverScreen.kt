@@ -3,14 +3,17 @@ package sliding.snake.game.screens
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Texture
+import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.ScreenUtils
 import sliding.snake.game.Config
 import sliding.snake.game.Main
 import sliding.snake.game.entities.Button
 
-class GameOverScreen(private val game: Main) : BaseScreen() {
+class GameOverScreen(private val game: Main, private val score: Int, private val additionalPoints: Int) : BaseScreen() {
 
+    private lateinit var bigFont: BitmapFont
+    private lateinit var font: BitmapFont
     private lateinit var backToMenuButton: Button
     private lateinit var backToMenuButtonTexture: Texture
     private lateinit var retryButton: Button
@@ -23,11 +26,18 @@ class GameOverScreen(private val game: Main) : BaseScreen() {
         retryButtonTexture = game.assets.get(Config.TEX_RETRY_BUTTON, Texture::class.java)
 
 
-        backToMenuButton = Button((Config.SCREEN_WIDTH - 200f)/2f, (Config.SCREEN_HEIGHT-100f)/2f - 100f,
-            200f, 100f, backToMenuButtonTexture)
+        backToMenuButton = Button(Config.SCREEN_WIDTH-250f, 150f, 200f, 100f,
+            backToMenuButtonTexture)
 
-        retryButton = Button((Config.SCREEN_WIDTH - 200f)/2f, (Config.SCREEN_HEIGHT-200f)/2f + 100f,
-            200f, 200f, retryButtonTexture)
+        retryButton = Button(50f, 150f,
+            100f, 100f, retryButtonTexture)
+
+        bigFont = game.assets.get(Config.BIG_PIXEL_FONT, BitmapFont::class.java)
+        font = game.assets.get(Config.MAIN_PIXEL_FONT, BitmapFont::class.java)
+
+        game.stats.updateHighestScore(score)
+        game.stats.addPoints(score + additionalPoints)
+        game.stats.addSingleplayerGame()
 
     }
 
@@ -56,6 +66,9 @@ class GameOverScreen(private val game: Main) : BaseScreen() {
         game.batch.projectionMatrix = camera.combined
 
         game.batch.begin()
+        bigFont.draw(game.batch, "GAME OVER", 0f, Config.SCREEN_HEIGHT-200f, Config.SCREEN_WIDTH, com.badlogic.gdx.utils.Align.center, false)
+        font.draw(game.batch, "YOUR SCORE: $score", 0f, Config.SCREEN_HEIGHT/2f, Config.SCREEN_WIDTH, com.badlogic.gdx.utils.Align.center, false)
+        font.draw(game.batch, "BONUS POINTS: $additionalPoints", 0f, Config.SCREEN_HEIGHT/2f - 100f, Config.SCREEN_WIDTH, com.badlogic.gdx.utils.Align.center, false)
         retryButton.draw(game.batch)
         backToMenuButton.draw(game.batch)
         game.batch.end()

@@ -9,14 +9,14 @@ buildscript {
   dependencies {
     classpath "com.android.tools.build:gradle:8.9.3"
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
-
+    classpath "com.google.devtools.ksp:symbol-processing-gradle-plugin:2.3.7"
   }
 }
 
 allprojects {
   apply plugin: 'eclipse'
   apply plugin: 'idea'
-
+  apply plugin: 'com.google.devtools.ksp'
   // This allows you to "Build and run using IntelliJ IDEA", an option in IDEA's Settings.
   idea {
     module {
@@ -56,7 +56,7 @@ configure(subprojects - project(':android')) {
   }
   compileKotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
   compileTestKotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-  
+
 }
 
 subprojects {

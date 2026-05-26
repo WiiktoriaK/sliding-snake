@@ -1,6 +1,8 @@
 package sliding.snake.game.screens
 
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.audio.Music
+import com.badlogic.gdx.audio.Sound
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.Texture
@@ -20,6 +22,9 @@ import sliding.snake.game.entities.Snake
 class GameScreen(private val game: Main): BaseScreen() {
 
     private lateinit var font: BitmapFont
+    private lateinit var biteSound: Sound
+    private lateinit var deathSound: Sound
+    private lateinit var boxSound: Sound
     private lateinit var pauseButton: Button
     private lateinit var pauseButtonTexture: Texture
     private var snakeCharacter: Snake? = null
@@ -39,14 +44,17 @@ class GameScreen(private val game: Main): BaseScreen() {
     private var nextObstacle = Config.NEXT_OBSTACLE_TIMERS.random()
     private var fruitsTimer = 0f
     private var nextFruit = Config.NEXT_FRUIT_TIMERS.random()
-
-    private var score = 0          // ile punktow zebralismy
-    private var mysteryBoxCounter = 0           // chyba ma sens
+    private var mysteryBoxTimer = 0f
+    private var nextMysteryBox = 10f
+    private var laneStatus = BooleanArray(3) {false}
+    private var score = 0
+    private var mysteryBoxCounter = 0
     private var speed = Config.BASIC_GAME_SPEED
     private var factor = 2f
     private val touch = Vector3()
     private var wasButtonClicked = false
     private var isDragging = true
+    private var isPaused = false
     private var touchStart = Vector3()
 
 
@@ -58,12 +66,19 @@ class GameScreen(private val game: Main): BaseScreen() {
         snakeTexture = game.assets.get(Config.TEX_SNAKE, Texture::class.java)
         fenceTexture = game.assets.get(Config.TEX_FENCE, Texture::class.java)
         fruitTexture = game.assets.get(Config.TEX_FRUIT, Texture::class.java)
+        mysteryBoxTexture = game.assets.get(Config.TEX_MYSTERY_BOX, Texture::class.java)
+
         font = game.assets.get(Config.MAIN_PIXEL_FONT, BitmapFont::class.java)
         font.color = Color.BLACK
+
+        biteSound = game.assets.get(Config.BITE_SOUND, Sound::class.java)
+        deathSound = game.assets.get(Config.DEATH_SOUND, Sound::class.java)
+        boxSound = game.assets.get(Config.BOX_SOUND, Sound::class.java)
 
         fenceHull = getHullPoints(Config.TEX_FENCE)
         snakeHull = getHullPoints(Config.TEX_SNAKE)
         fruitHull = getHullPoints(Config.TEX_FRUIT)
+        mysteryBoxHull = getHullPoints(Config.TEX_MYSTERY_BOX)
 
         pauseButton = Button(Config.SCREEN_WIDTH-100f, Config.SCREEN_HEIGHT-150f, 100f, 100f,
             pauseButtonTexture)
@@ -74,6 +89,11 @@ class GameScreen(private val game: Main): BaseScreen() {
 
     override fun render(delta: Float) {
         ScreenUtils.clear(Color.LIME)
+        if(isPaused){
+            draw()
+            unpause()
+            return
+        }
         speedTimer += delta
         if(speedTimer > 5f){
             speedTimer = 0f
@@ -81,25 +101,37 @@ class GameScreen(private val game: Main): BaseScreen() {
         }
         handleObstacles(delta)
         handleFruits(delta)
+        handleMysteryBoxes(delta)
+        updateLaneStatus()
         snakeCharacter!!.update(delta)
 
-        // tu potrzebuje sie przeiterowac po kazdym owocku
-        val it = fruits.iterator()
-        while(it.hasNext()){
-            val fruit = it.next()
+        val itFruits = fruits.iterator()
+        while(itFruits.hasNext()){
+            val fruit = itFruits.next()
             if(snakeCharacter!!.checkCollision(fruit.collisionPolygon)){
+                biteSound.play(game.soundsVolume)
                 score += 1
-                it.remove()
+                itFruits.remove()
+            }
+        }
+
+        val itBoxes = mysteryBoxes.iterator()
+        while(itBoxes.hasNext()){
+            val box = itBoxes.next()
+            if(snakeCharacter!!.checkCollision(box.collisionPolygon)){
+                boxSound.play(game.soundsVolume)
+                mysteryBoxCounter += 1
+                itBoxes.remove()
             }
         }
 
         obstacles.forEach {
             if(snakeCharacter!!.checkCollision(it.collisionPolygon)){
-                //game.setScreen(GameOverScreen(game))
+                deathSound.play(game.soundsVolume)
                 if(mysteryBoxCounter > 0){
-                    game.setScreen(MysteryBoxScreen(game, mysteryBoxCounter))
+                    game.setScreen(MysteryBoxScreen(game, score, 0,mysteryBoxCounter))
                 }else{
-                    game.setScreen(GameOverScreen(game))
+                    game.setScreen(GameOverScreen(game, score, 0))
                 }
             }
         }
@@ -115,9 +147,13 @@ class GameScreen(private val game: Main): BaseScreen() {
         game.batch.begin()
         snakeCharacter!!.draw(game.batch)
         obstacles.forEach { it.draw(game.batch) }
-        fruits.forEach{ it.draw(game.batch)}                    // bedziemy usuwac mozliwosc narysowania owocka w plotku
+        fruits.forEach{ it.draw(game.batch)}
+        mysteryBoxes.forEach { it.draw(game.batch) }
         pauseButton.draw(game.batch)
         font.draw(game.batch, "SCORE: $score", 50f, Config.SCREEN_HEIGHT - 50f)
+        if(isPaused){
+            font.draw(game.batch, "TAP TO UNPAUSE", 0f, Config.SCREEN_HEIGHT/2f, Config.SCREEN_WIDTH, com.badlogic.gdx.utils.Align.center, false)
+        }
         game.batch.end()
 
     }
@@ -129,6 +165,7 @@ class GameScreen(private val game: Main): BaseScreen() {
 
             if(pauseButton.isClicked(touch)){
                 wasButtonClicked = true
+                isPaused = true
                 game.setScreen(PauseScreen(game, this))
                 return
             }
@@ -156,13 +193,22 @@ class GameScreen(private val game: Main): BaseScreen() {
         }
     }
 
+    private fun unpause(){
+        if(Gdx.input.justTouched()){
+            isPaused = false
+        }
+    }
     private fun handleObstacles(delta: Float){
         obstaclesTimer += delta
 
         if(obstaclesTimer >= nextObstacle){
-            obstacles.add(Obstacle((0..2).random(), 200f, 160f, fenceTexture, fenceHull))
-            obstaclesTimer = 0f
-            nextObstacle = Config.NEXT_OBSTACLE_TIMERS.random()/factor
+            val newObstacleLane = getFreeLaneNumber()
+            if(newObstacleLane != -1){
+                obstacles.add(Obstacle(newObstacleLane, 200f, 160f, fenceTexture, fenceHull))
+                laneStatus[newObstacleLane] = true
+                obstaclesTimer = 0f
+                nextObstacle = Config.NEXT_OBSTACLE_TIMERS.random()/factor
+            }
         }
 
 
@@ -175,16 +221,18 @@ class GameScreen(private val game: Main): BaseScreen() {
                 it.remove()
             }
         }
-
-
     }
 
     private fun handleFruits(delta: Float){
         fruitsTimer += delta
         if(fruitsTimer >= nextFruit){
-            fruits.add(Fruit((0..2).random(), 100f, 100f, fruitTexture, fruitHull))
-            fruitsTimer = 0f
-            nextFruit = Config.NEXT_FRUIT_TIMERS.random()/factor
+            val newFruitLane = getFreeLaneNumber()
+            if(newFruitLane != -1){
+                fruits.add(Fruit(newFruitLane, 100f, 100f, fruitTexture, fruitHull))
+                laneStatus[newFruitLane] = true
+                fruitsTimer = 0f
+                nextFruit = Config.NEXT_FRUIT_TIMERS.random()/factor
+            }
         }
 
         val it = fruits.iterator()
@@ -196,7 +244,29 @@ class GameScreen(private val game: Main): BaseScreen() {
                 it.remove()
             }
         }
+    }
 
+    private fun handleMysteryBoxes(delta: Float){
+        mysteryBoxTimer += delta
+        if(mysteryBoxTimer >= nextMysteryBox){
+            val newBoxLane = getFreeLaneNumber()
+            if(newBoxLane != -1){
+                mysteryBoxes.add(MysteryBox(newBoxLane, 100f, 100f, mysteryBoxTexture, mysteryBoxHull))
+                laneStatus[newBoxLane] = true
+                mysteryBoxTimer = 0f
+            }
+        }
+
+        val it = mysteryBoxes.iterator()
+
+        while(it.hasNext()){
+            val box = it.next()
+            box.update(delta, speed*factor)
+
+            if(box.y + box.mysteryBoxHeight < 0){
+                it.remove()
+            }
+        }
     }
 
     private fun getHullPoints(texturePath: String): FloatArray{
@@ -222,5 +292,37 @@ class GameScreen(private val game: Main): BaseScreen() {
         return hullGenerator.computePolygon(points.toFloatArray(), false).toArray()
     }
 
+    private fun getFreeLaneNumber(): Int{
+        val freeLanes = laneStatus.indices.filter { index -> !laneStatus[index] }
+
+        if(freeLanes.isEmpty()) return -1
+        return freeLanes.random()
+    }
+
+    private fun updateLaneStatus(){
+        for(i in laneStatus.indices){
+            laneStatus[i] = false
+        }
+
+        obstacles.forEach { obstacle->
+            if(obstacle.y + obstacle.obstacleHeight > Config.SCREEN_HEIGHT){
+                laneStatus[obstacle.getLane()] = true
+            }
+        }
+
+        fruits.forEach{fruit->
+            if(fruit.y + fruit.fruitHeight > Config.SCREEN_HEIGHT){
+                laneStatus[fruit.getLane()] = true
+            }
+        }
+
+        mysteryBoxes.forEach{ box->
+            if(box.y + box.mysteryBoxHeight > Config.SCREEN_HEIGHT){
+                laneStatus[box.getLane()] = true
+            }
+        }
+
+
+    }
 
 }

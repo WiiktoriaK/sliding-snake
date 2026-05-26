@@ -50,7 +50,7 @@ android {
   }
 
   kotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-  
+
 }
 
 repositories {
@@ -61,6 +61,9 @@ repositories {
 configurations { natives }
 
 dependencies {
+  implementation "androidx.room:room-runtime:2.7.1"
+  implementation "androidx.room:room-ktx:2.7.1"
+  ksp "androidx.room:room-compiler:2.7.1"
   coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
   implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
   implementation project(':core')
